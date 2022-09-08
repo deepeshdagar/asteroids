@@ -1,0 +1,73 @@
+1. Require persistent db to store the required data. We can use mongo, casandra & elastic search (using this)
+2. Can also introduce cache in between application requests and db with a defined time (~ 1-2 hrs), depending on how frequesnt requests we get .
+3. Can also optimize further and keep the pre-processed data as well, so that we can save time on application api-response time
+--- pre-processing the data for fixed 8 days. Can divide months in 8 days parts ( 1-8, 9-16, 17-25, 26-end of month..28,29,30,31)
+--- preprocess the size 10 data for all available properties.
+--- when requests comes, divide them in the 8-days blocks as above &
+    checks the preprocessed data first, if present, get that. If not present, get the data and start an async process
+    to preprocess the data as well.
+--- if any requests doesn't lie in the 8-days block, go for individual day data and use sort and get top 10 results and then join it further.
+--- preprocessing can be further extended for months, year and store top 10 asteroids data as per all available property.
+--- if year query, then can directly get the single data from the preprocessed data
+--- can have a background job running at off-hours, which will check if all data of week is present for 8-day block, month, year, then we can process and store the data.
+
+4. can also apply rate limit or block requests on application as only 1000 api calls are allowed on nasa api's per hour.
+Can keep a global counter which keeps a track per hour and blocks further requests.
+
+
+Asteroid data schema :
+- store asteroid data as per below
+    - docId : asteroid_id
+    - { "name" : String,
+        "date" : Date (indexable)
+        "velocity" : "" (indexable)
+        "diameter" : "" (indexable)
+        "closestDistance" :"" (indexable)
+        "data" : { //asteroid data in json} //dont need to be indexable
+    }
+
+
+Pre-processing 8-days :
+- get datas of the desired 8 days,
+- compare the data on property and prepare the document for that 8-day block.
+
+Pre-processing month :
+- get all 8-days block data for that month from es
+- compare and prepare documents for month for all properties and in all orders
+
+Pre-processing year :
+- get all months data for that year from es
+- compare and prepare year documents for month for all properties and in all orders
+
+
+Pre process db schema for defined 8 days block  :
+docId : year_month_blockNo_property(distance/size/velocity)_order(asc/desc)
+{
+   "month" : "", //indexable
+   "year" : "" //indexable
+   "dayblock" : "" / indexable
+   "startDate" : "" //indexable
+   "endDate" : "" //indexable
+   "property" : "" //indexable
+   "order" : "" //indexable
+   "asteroids": [
+   "",
+   ""] //sorted list of doc Ids. no need to be indexable
+   // can also store the property value also in asteroids, this will help us in comparing over this data for multiple and then only get the required data by id.
+}
+
+PreProcess db schema for month / year : data can be same excluding month in year data and dayblock in month data, the docIds are :
+month : docId : year_month_property_order
+year : docId : year_property_order
+
+Pros of using Elastic Search
+
+-- we can directly query elastic search and use in-built sort based on input : date, and sorting parameters.
+-- we can further provide search and filter on asteroid name, closest to given diameter, velocity and other properties
+-- elastic search is efficient to store large scale data and handle search and other queries.
+-- for pre-process data we can use any
+
+
+Challenges :
+-- if any new property gets added to asteroids on which we need to provide the data, we have to re-index and introduce the new filter field as well
+    and pre-process the data for this new feature if data is present.
